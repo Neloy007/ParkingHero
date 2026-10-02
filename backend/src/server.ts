@@ -1,17 +1,11 @@
 import dotenv from "dotenv";
-import app from "./app";
-import connectDatabase from "./config/database";
 
 dotenv.config();
 
+import app from "./app";
+
 const PORT = process.env.PORT || 5000;
 
-const startServer = async (): Promise<void> => {
-  await connectDatabase();
-
-  app.listen(PORT, () => {
-    console.log(`ParkingHero API running on http://localhost:${PORT}`);
-  });
-};
-
-startServer();
+app.listen(PORT, () => {
+  console.log(`ParkingHero API running on port ${PORT}`);
+});

@@ -4,15 +4,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv_1 = __importDefault(require("dotenv"));
-const app_1 = __importDefault(require("./app"));
-const database_1 = __importDefault(require("./config/database"));
 dotenv_1.default.config();
+const app_1 = __importDefault(require("./app"));
 const PORT = process.env.PORT || 5000;
-const startServer = async () => {
-    await (0, database_1.default)();
-    app_1.default.listen(PORT, () => {
-        console.log(`ParkingHero API running on http://localhost:${PORT}`);
-    });
-};
-startServer();
+app_1.default.listen(PORT, () => {
+    console.log(`ParkingHero API running on port ${PORT}`);
+});
 //# sourceMappingURL=server.js.map

@@ -5,10 +5,34 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.login = exports.register = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const User_1 = __importDefault(require("../models/User"));
+/**
+ * Generate JWT token
+ */
+const generateToken = (userId, role) => {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        throw new Error("JWT_SECRET is not defined");
+    }
+    const options = {
+        expiresIn: "15m",
+    };
+    return jsonwebtoken_1.default.sign({
+        userId,
+        role,
+    }, secret, options);
+};
+/**
+ * Register a new user
+ *
+ * Public registration always creates a DRIVER.
+ * ADMIN/OWNER accounts should be managed by an ADMIN.
+ */
 const register = async (req, res) => {
     try {
-        const { name, email, phone, password, role } = req.body;
+        const { name, email, phone, password } = req.body;
+        // Validate required fields
         if (!name || !email || !phone || !password) {
             res.status(400).json({
                 success: false,
@@ -16,6 +40,7 @@ const register = async (req, res) => {
             });
             return;
         }
+        // Validate password
         if (password.length < 6) {
             res.status(400).json({
                 success: false,
@@ -23,7 +48,9 @@ const register = async (req, res) => {
             });
             return;
         }
+        // Normalize email
         const normalizedEmail = email.toLowerCase().trim();
+        // Check existing user
         const existingUser = await User_1.default.findOne({
             email: normalizedEmail,
         });
@@ -34,14 +61,21 @@ const register = async (req, res) => {
             });
             return;
         }
+        // Hash password
         const hashedPassword = await bcryptjs_1.default.hash(password, 12);
+        // Create user
+        // Public registration ALWAYS creates DRIVER
         const user = await User_1.default.create({
             name: name.trim(),
             email: normalizedEmail,
             phone: phone.trim(),
             password: hashedPassword,
-            role: role === "OWNER" ? "OWNER" : "DRIVER",
+            role: "DRIVER",
+            isActive: true,
         });
+        // Generate JWT
+        const token = generateToken(user._id.toString(), user.role);
+        // Response
         res.status(201).json({
             success: true,
             message: "User registered successfully",
@@ -51,6 +85,7 @@ const register = async (req, res) => {
                 email: user.email,
                 phone: user.phone,
                 role: user.role,
+                token,
             },
         });
     }
@@ -63,9 +98,13 @@ const register = async (req, res) => {
     }
 };
 exports.register = register;
+/**
+ * Login
+ */
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
+        // Validate required fields
         if (!email || !password) {
             res.status(400).json({
                 success: false,
@@ -73,7 +112,9 @@ const login = async (req, res) => {
             });
             return;
         }
+        // Normalize email
         const normalizedEmail = email.toLowerCase().trim();
+        // Find user
         const user = await User_1.default.findOne({
             email: normalizedEmail,
         });
@@ -84,6 +125,15 @@ const login = async (req, res) => {
             });
             return;
         }
+        // Check account status
+        if (!user.isActive) {
+            res.status(403).json({
+                success: false,
+                message: "Your account has been disabled",
+            });
+            return;
+        }
+        // Check password
         const isPasswordCorrect = await bcryptjs_1.default.compare(password, user.password);
         if (!isPasswordCorrect) {
             res.status(401).json({
@@ -92,6 +142,9 @@ const login = async (req, res) => {
             });
             return;
         }
+        // Generate JWT
+        const token = generateToken(user._id.toString(), user.role);
+        // Response
         res.status(200).json({
             success: true,
             message: "Login successful",
@@ -101,6 +154,7 @@ const login = async (req, res) => {
                 email: user.email,
                 phone: user.phone,
                 role: user.role,
+                token,
             },
         });
     }

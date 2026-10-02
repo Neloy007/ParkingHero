@@ -8,6 +8,7 @@ const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const morgan_1 = __importDefault(require("morgan"));
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
+const adminRoutes_1 = __importDefault(require("./routes/adminRoutes"));
 const database_1 = __importDefault(require("./config/database"));
 const app = (0, express_1.default)();
 app.use((0, helmet_1.default)());
@@ -38,5 +39,6 @@ app.get("/api/health/db", async (_req, res) => {
     }
 });
 app.use("/api/auth", authRoutes_1.default);
+app.use("/api/admin", adminRoutes_1.default);
 exports.default = app;
 //# sourceMappingURL=app.js.map

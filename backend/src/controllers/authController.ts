@@ -1,11 +1,45 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
+import jwt, { SignOptions } from "jsonwebtoken";
 import User from "../models/User";
 
+type UserRole = "ADMIN" | "OWNER" | "DRIVER";
+
+/**
+ * Generate JWT token
+ */
+const generateToken = (userId: string, role: UserRole): string => {
+  const secret = process.env.JWT_SECRET;
+
+  if (!secret) {
+    throw new Error("JWT_SECRET is not defined");
+  }
+
+  const options: SignOptions = {
+    expiresIn: "15m",
+  };
+
+  return jwt.sign(
+    {
+      userId,
+      role,
+    },
+    secret,
+    options,
+  );
+};
+
+/**
+ * Register a new user
+ *
+ * Public registration always creates a DRIVER.
+ * ADMIN/OWNER accounts should be managed by an ADMIN.
+ */
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, phone, password, role } = req.body;
+    const { name, email, phone, password } = req.body;
 
+    // Validate required fields
     if (!name || !email || !phone || !password) {
       res.status(400).json({
         success: false,
@@ -14,6 +48,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Validate password
     if (password.length < 6) {
       res.status(400).json({
         success: false,
@@ -22,8 +57,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Normalize email
     const normalizedEmail = email.toLowerCase().trim();
 
+    // Check existing user
     const existingUser = await User.findOne({
       email: normalizedEmail,
     });
@@ -36,16 +73,24 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // Create user
+    // Public registration ALWAYS creates DRIVER
     const user = await User.create({
       name: name.trim(),
       email: normalizedEmail,
       phone: phone.trim(),
       password: hashedPassword,
-      role: role === "OWNER" ? "OWNER" : "DRIVER",
+      role: "DRIVER",
+      isActive: true,
     });
 
+    // Generate JWT
+    const token = generateToken(user._id.toString(), user.role);
+
+    // Response
     res.status(201).json({
       success: true,
       message: "User registered successfully",
@@ -55,6 +100,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        token,
       },
     });
   } catch (error) {
@@ -67,10 +113,14 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+/**
+ * Login
+ */
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
+    // Validate required fields
     if (!email || !password) {
       res.status(400).json({
         success: false,
@@ -79,8 +129,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Normalize email
     const normalizedEmail = email.toLowerCase().trim();
 
+    // Find user
     const user = await User.findOne({
       email: normalizedEmail,
     });
@@ -93,6 +145,16 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Check account status
+    if (!user.isActive) {
+      res.status(403).json({
+        success: false,
+        message: "Your account has been disabled",
+      });
+      return;
+    }
+
+    // Check password
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
 
     if (!isPasswordCorrect) {
@@ -103,6 +165,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Generate JWT
+    const token = generateToken(user._id.toString(), user.role);
+
+    // Response
     res.status(200).json({
       success: true,
       message: "Login successful",
@@ -112,6 +178,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        token,
       },
     });
   } catch (error) {

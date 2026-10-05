@@ -15,7 +15,7 @@ const authenticate = (req, res, next) => {
             });
             return;
         }
-        const token = authHeader.split(" ")[1];
+        const token = authHeader.substring(7).trim();
         if (!token) {
             res.status(401).json({
                 success: false,
@@ -32,13 +32,23 @@ const authenticate = (req, res, next) => {
             return;
         }
         const decoded = jsonwebtoken_1.default.verify(token, secret);
+        if (typeof decoded !== "object" ||
+            decoded === null ||
+            typeof decoded.userId !== "string" ||
+            !["ADMIN", "OWNER", "DRIVER"].includes(decoded.role)) {
+            res.status(401).json({
+                success: false,
+                message: "Invalid token payload",
+            });
+            return;
+        }
         req.user = {
             userId: decoded.userId,
             role: decoded.role,
         };
         next();
     }
-    catch (error) {
+    catch {
         res.status(401).json({
             success: false,
             message: "Invalid or expired token",

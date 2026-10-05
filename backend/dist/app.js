@@ -22,6 +22,12 @@ app.get("/", (_req, res) => {
         version: "1.0.0",
     });
 });
+app.get("/api/health", (_req, res) => {
+    res.status(200).json({
+        success: true,
+        message: "ParkingHero API is running",
+    });
+});
 app.get("/api/health/db", async (_req, res) => {
     try {
         await (0, database_1.default)();
